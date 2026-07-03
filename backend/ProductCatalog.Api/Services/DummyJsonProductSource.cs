@@ -11,8 +11,8 @@ public class DummyJsonProductSource : IProductSource
         _httpClient = httpClient;
     }
 
-    // DummyJSON vraća proizvode umotane u objekt: { "products": [...], "total": 194 }
-    // pa nam treba pomoćna klasa za taj omotač
+    // DummyJSON ne vraća golu listu nego objekt { "products": [...], "total": 194 },
+    // pa nam treba klasa istog oblika da se JSON ispravno pretvori
     private class ProductsResponse
     {
         public List<Product> Products { get; set; } = new();
@@ -20,29 +20,59 @@ public class DummyJsonProductSource : IProductSource
 
     public async Task<List<Product>> GetProductsAsync()
     {
-        var response = await _httpClient.GetFromJsonAsync<ProductsResponse>("products?limit=0");
-        return response?.Products ?? new List<Product>();
+        // limit=0 znači "vrati sve proizvode" (inače DummyJSON vrati samo 30)
+        ProductsResponse? response =
+            await _httpClient.GetFromJsonAsync<ProductsResponse>("products?limit=0");
+
+        if (response == null)
+        {
+            return new List<Product>();
+        }
+
+        return response.Products;
     }
 
     public async Task<Product?> GetProductByIdAsync(int id)
     {
-        var response = await _httpClient.GetAsync($"products/{id}");
-        if (!response.IsSuccessStatusCode)
-            return null;
+        HttpResponseMessage response = await _httpClient.GetAsync("products/" + id);
 
-        return await response.Content.ReadFromJsonAsync<Product>();
+        // Ako DummyJSON kaže da proizvod ne postoji (npr. 404), vraćamo null
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        Product? product = await response.Content.ReadFromJsonAsync<Product>();
+        return product;
     }
 
     public async Task<List<Product>> SearchProductsAsync(string query)
     {
-        var response = await _httpClient.GetFromJsonAsync<ProductsResponse>(
-            $"products/search?q={Uri.EscapeDataString(query)}");
-        return response?.Products ?? new List<Product>();
+        // EscapeDataString sigurno kodira korisnikov unos za URL
+        // (razmak postane %20, znak & ne razbije adresu itd.)
+        string url = "products/search?q=" + Uri.EscapeDataString(query);
+
+        ProductsResponse? response =
+            await _httpClient.GetFromJsonAsync<ProductsResponse>(url);
+
+        if (response == null)
+        {
+            return new List<Product>();
+        }
+
+        return response.Products;
     }
 
     public async Task<List<string>> GetCategoriesAsync()
     {
-        var categories = await _httpClient.GetFromJsonAsync<List<string>>("products/category-list");
-        return categories ?? new List<string>();
+        List<string>? categories =
+            await _httpClient.GetFromJsonAsync<List<string>>("products/category-list");
+
+        if (categories == null)
+        {
+            return new List<string>();
+        }
+
+        return categories;
     }
 }
