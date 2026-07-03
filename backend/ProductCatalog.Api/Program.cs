@@ -2,11 +2,9 @@ using ProductCatalog.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-
-builder.Services.AddControllers();          
-builder.Services.AddEndpointsApiExplorer(); 
-builder.Services.AddSwaggerGen();           
-
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
 builder.Services.AddHttpClient<IProductSource, DummyJsonProductSource>(client =>
 {
@@ -15,13 +13,23 @@ builder.Services.AddHttpClient<IProductSource, DummyJsonProductSource>(client =>
     client.BaseAddress = new Uri(baseUrl);
 });
 
-var app = builder.Build();
+builder.Services.AddCors();
 
+var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();    
-    app.UseSwaggerUI(); 
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
-app.MapControllers();    
+app.UseCors(policy =>
+{
+    policy.WithOrigins("http://localhost:5173");
+    policy.AllowAnyHeader();
+    policy.AllowAnyMethod();
+});
+
+app.MapControllers();
+
+app.Run();
