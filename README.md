@@ -10,8 +10,10 @@ Tok podataka: **frontend → backend → DummyJSON**
 ## Struktura repozitorija
 
 ```
-backend/ProductCatalog.Api/   ASP.NET Web API (.NET 9)
-frontend/                     React + TypeScript (Vite)
+backend/ProductCatalog.Api/        ASP.NET Web API (.NET 9)
+backend/ProductCatalog.Api.Tests/  Unit testovi (xUnit)
+frontend/                          React + TypeScript (Vite)
+docs/                              Dokumentacija korištenja AI alata
 ```
 
 ## Preduvjeti
@@ -47,12 +49,28 @@ Frontend se pokreće na `http://localhost:5173`.
 
 Konfiguracija je u `frontend/.env`:
 
-| Varijabla      | Opis                    | Zadana vrijednost           |
-|----------------|-------------------------|-----------------------------|
+| Varijabla      | Opis                        | Zadana vrijednost           |
+|----------------|-----------------------------|-----------------------------|
 | `VITE_API_URL` | Bazna adresa backend API-ja | `http://localhost:5262/api` |
 
 Za rad aplikacije oba servera moraju biti pokrenuta istovremeno
 (backend u jednom terminalu, frontend u drugom).
+
+## Pokretanje testova
+
+Backend (xUnit — unit testovi controllera s lažnim izvorom podataka):
+
+```
+cd backend/ProductCatalog.Api.Tests
+dotnet test
+```
+
+Frontend (Vitest + React Testing Library — komponentni testovi stanja sučelja):
+
+```
+cd frontend
+npm run test
+```
 
 ## Backend endpointovi
 
@@ -91,6 +109,11 @@ je prihvatljivo; kod većeg izvora razmotrila bih caching dohvaćene liste kako
 se ponovljeni pozivi pretrage i filtriranja ne bi svaki put prosljeđivali
 vanjskom izvoru.
 
+Backend logira ključne događaje (info za dohvate, warning za nepostojeće
+proizvode, error za nedostupnost vanjskog izvora) i vraća odgovarajuće
+statusne kodove: 404 kada proizvod ne postoji, 502 kada vanjski izvor ne
+odgovara.
+
 ## Funkcionalnosti frontenda
 
 - Lista proizvoda u karticama s paginacijom
@@ -115,5 +138,4 @@ Tijekom izrade zadatka koristila sam Claude (Anthropic) kao mentora:
 - vođenje kroz implementaciju frontenda (React Router, stanje filtera u URL-u
   kroz `useSearchParams`, debounce pretrage)
 
- Primjere promptova
-prilažem u `docs/ai-usage.md`.
+Primjere promptova prilažem u `docs/ai-usage.md`.
