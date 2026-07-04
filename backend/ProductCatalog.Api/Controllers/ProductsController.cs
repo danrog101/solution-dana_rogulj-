@@ -9,10 +9,12 @@ namespace ProductCatalog.Api.Controllers;
 public class ProductsController : ControllerBase
 {
     private readonly IProductSource _source;
+    private readonly ILogger<ProductsController> _logger;
 
-    public ProductsController(IProductSource source)
+    public ProductsController(IProductSource source, ILogger<ProductsController> logger)
     {
         _source = source;
+        _logger = logger;
     }
 
     [HttpGet]
@@ -24,21 +26,30 @@ public class ProductsController : ControllerBase
         int page = 1,
         int pageSize = 12)
     {
-        
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > 100) pageSize = 12;
 
+        _logger.LogInformation(
+            "Dohvat proizvoda: search={Search}, category={Category}, minPrice={MinPrice}, maxPrice={MaxPrice}, page={Page}",
+            search, category, minPrice, maxPrice, page);
 
         List<Product> allProducts;
-        if (search == null || search.Trim() == "")
+        try
         {
-            allProducts = await _source.GetProductsAsync();
+            if (search == null || search.Trim() == "")
+            {
+                allProducts = await _source.GetProductsAsync();
+            }
+            else
+            {
+                allProducts = await _source.SearchProductsAsync(search);
+            }
         }
-        else
+        catch (Exception ex)
         {
-            allProducts = await _source.SearchProductsAsync(search);
+            _logger.LogError(ex, "Greška pri dohvatu proizvoda iz vanjskog izvora");
+            return StatusCode(502, new { message = "Vanjski izvor podataka trenutno nije dostupan." });
         }
-
 
         List<Product> filtered = new List<Product>();
         foreach (Product p in allProducts)
@@ -48,17 +59,16 @@ public class ProductsController : ControllerBase
                 continue;
 
             if (minPrice != null && p.Price < minPrice)
-                continue; 
+                continue;
 
             if (maxPrice != null && p.Price > maxPrice)
-                continue; 
+                continue;
 
             filtered.Add(p);
         }
 
-
         int total = filtered.Count;
-        int start = (page - 1) * pageSize; 
+        int start = (page - 1) * pageSize;
 
         List<ProductListItem> items = new List<ProductListItem>();
         for (int i = start; i < start + pageSize && i < total; i++)
@@ -66,7 +76,6 @@ public class ProductsController : ControllerBase
             items.Add(ToListItem(filtered[i]));
         }
 
-    
         ProductListResponse response = new ProductListResponse
         {
             Items = items,
@@ -78,24 +87,42 @@ public class ProductsController : ControllerBase
         return Ok(response);
     }
 
- 
     [HttpGet("{id:int}")]
     public async Task<ActionResult<Product>> GetProductById(int id)
     {
-        Product? product = await _source.GetProductByIdAsync(id);
+        Product? product;
+        try
+        {
+            product = await _source.GetProductByIdAsync(id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Greška pri dohvatu proizvoda {Id} iz vanjskog izvora", id);
+            return StatusCode(502, new { message = "Vanjski izvor podataka trenutno nije dostupan." });
+        }
 
         if (product == null)
+        {
+            _logger.LogWarning("Traženi proizvod {Id} ne postoji", id);
             return NotFound(new { message = $"Proizvod s ID-em {id} ne postoji." });
+        }
 
         return Ok(product);
     }
 
-   
     [HttpGet("categories")]
     public async Task<ActionResult<List<string>>> GetCategories()
     {
-        List<string> categories = await _source.GetCategoriesAsync();
-        return Ok(categories);
+        try
+        {
+            List<string> categories = await _source.GetCategoriesAsync();
+            return Ok(categories);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Greška pri dohvatu kategorija iz vanjskog izvora");
+            return StatusCode(502, new { message = "Vanjski izvor podataka trenutno nije dostupan." });
+        }
     }
 
     private static ProductListItem ToListItem(Product p)
